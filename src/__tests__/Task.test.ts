@@ -11,7 +11,7 @@ import {
   getTaskWorkTime,
   resetTaskIdCounter,
 } from '../game/Task';
-import { TaskType, BuildType, Task } from '../game/types';
+import { TaskType, BuildType } from '../game/types';
 import { WORK_TIMES, BUILD_WORK_TIMES } from '../game/constants';
 
 describe('Task System', () => {

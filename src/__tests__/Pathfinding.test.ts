@@ -6,7 +6,7 @@ import {
   heuristic,
   isWalkable,
 } from '../game/Pathfinding';
-import { TileType, Tile, Position } from '../game/types';
+import { TileType, Tile } from '../game/types';
 import { WORLD_WIDTH, WORLD_HEIGHT } from '../game/constants';
 
 function createEmptyTile(type: TileType = TileType.GRASS): Tile {

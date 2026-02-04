@@ -23,7 +23,7 @@ import {
   resetColonistIdCounter
 } from '../game/Colonist';
 import { ColonistState, Trait, TaskType } from '../game/types';
-import { NEED_DECAY, NEED_THRESHOLDS, TRAIT_WORK_MODIFIER } from '../game/constants';
+// Constants imported for reference, not directly used in tests
 
 describe('Colonist', () => {
   beforeEach(() => {
