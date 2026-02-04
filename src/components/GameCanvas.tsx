@@ -1,0 +1,211 @@
+'use client';
+
+import { useRef, useEffect, useState, useCallback } from 'react';
+import { GameState, GameScreen, DesignMode, BuildType, Position } from '../game/types';
+import { CANVAS_WIDTH, CANVAS_HEIGHT, TILE_SIZE } from '../game/constants';
+import {
+  createGame,
+  startGame,
+  updateGame,
+  togglePause,
+  setDesignMode,
+  setSelectedBuild,
+  designateArea,
+} from '../game/Game';
+import { renderGame, renderSelection } from '../game/Renderer';
+
+import TitleScreen from './TitleScreen';
+import StatusBar from './StatusBar';
+import ColonistPanel from './ColonistPanel';
+import TaskPanel from './TaskPanel';
+import AlertLog from './AlertLog';
+import HelpOverlay from './HelpOverlay';
+
+export default function GameCanvas() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [game, setGame] = useState<GameState>(() => createGame());
+  const [showHelp, setShowHelp] = useState(false);
+  const [dragStart, setDragStart] = useState<Position | null>(null);
+  const [dragEnd, setDragEnd] = useState<Position | null>(null);
+  
+  const lastTimeRef = useRef<number>(0);
+  
+  // Game loop
+  useEffect(() => {
+    if (game.screen !== GameScreen.PLAYING) return;
+    
+    let animationId: number;
+    
+    const loop = (time: number) => {
+      const dt = lastTimeRef.current ? (time - lastTimeRef.current) / 1000 : 0;
+      lastTimeRef.current = time;
+      
+      // Limit dt to prevent huge jumps
+      const clampedDt = Math.min(dt, 0.1);
+      
+      updateGame(game, clampedDt);
+      setGame({ ...game });
+      
+      animationId = requestAnimationFrame(loop);
+    };
+    
+    animationId = requestAnimationFrame(loop);
+    
+    return () => {
+      cancelAnimationFrame(animationId);
+    };
+  }, [game.screen, game.paused]);
+  
+  // Render
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    renderGame(ctx, game);
+    
+    // Draw selection overlay if dragging
+    if (dragStart && dragEnd && game.designMode !== DesignMode.NONE) {
+      renderSelection(ctx, dragStart, dragEnd);
+    }
+  }, [game, dragStart, dragEnd]);
+  
+  // Keyboard handlers
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (game.screen !== GameScreen.PLAYING) return;
+      
+      switch (e.key.toLowerCase()) {
+        case 'd':
+          // Cycle through designations
+          if (game.designMode === DesignMode.MINE) {
+            setDesignMode(game, DesignMode.CHOP);
+          } else {
+            setDesignMode(game, DesignMode.MINE);
+          }
+          setGame({ ...game });
+          break;
+          
+        case 'b':
+          // Build mode - cycle through build types
+          if (game.designMode === DesignMode.BUILD) {
+            const types = [BuildType.WALL, BuildType.FLOOR, BuildType.DOOR, BuildType.BED];
+            const currentIdx = game.selectedBuild ? types.indexOf(game.selectedBuild) : -1;
+            const nextIdx = (currentIdx + 1) % types.length;
+            setSelectedBuild(game, types[nextIdx]);
+          } else {
+            setSelectedBuild(game, BuildType.WALL);
+          }
+          setGame({ ...game });
+          break;
+          
+        case 's':
+          setDesignMode(game, DesignMode.STOCKPILE);
+          setGame({ ...game });
+          break;
+          
+        case ' ':
+          e.preventDefault();
+          togglePause(game);
+          setGame({ ...game });
+          break;
+          
+        case 'escape':
+          setDesignMode(game, DesignMode.NONE);
+          setDragStart(null);
+          setDragEnd(null);
+          setGame({ ...game });
+          break;
+          
+        case '?':
+          setShowHelp(true);
+          break;
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [game]);
+  
+  // Mouse handlers
+  const getTilePos = useCallback((e: React.MouseEvent<HTMLCanvasElement>): Position => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+    
+    const rect = canvas.getBoundingClientRect();
+    const x = Math.floor((e.clientX - rect.left) / TILE_SIZE);
+    const y = Math.floor((e.clientY - rect.top) / TILE_SIZE);
+    
+    return { x, y };
+  }, []);
+  
+  const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (game.screen !== GameScreen.PLAYING) return;
+    if (game.designMode === DesignMode.NONE) return;
+    
+    const pos = getTilePos(e);
+    setDragStart(pos);
+    setDragEnd(pos);
+  }, [game.screen, game.designMode, getTilePos]);
+  
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!dragStart) return;
+    
+    const pos = getTilePos(e);
+    setDragEnd(pos);
+  }, [dragStart, getTilePos]);
+  
+  const handleMouseUp = useCallback(() => {
+    if (!dragStart || !dragEnd) return;
+    if (game.designMode === DesignMode.NONE) return;
+    
+    designateArea(game, dragStart, dragEnd);
+    setGame({ ...game });
+    
+    setDragStart(null);
+    setDragEnd(null);
+  }, [dragStart, dragEnd, game]);
+  
+  // Game start handler
+  const handleStart = useCallback(() => {
+    startGame(game);
+    setGame({ ...game });
+  }, [game]);
+  
+  return (
+    <div className="relative" style={{ width: CANVAS_WIDTH, height: CANVAS_HEIGHT }}>
+      <canvas
+        ref={canvasRef}
+        width={CANVAS_WIDTH}
+        height={CANVAS_HEIGHT}
+        className="bg-black"
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={() => {
+          setDragStart(null);
+          setDragEnd(null);
+        }}
+      />
+      
+      {game.screen === GameScreen.TITLE && (
+        <TitleScreen onStart={handleStart} />
+      )}
+      
+      {game.screen === GameScreen.PLAYING && (
+        <>
+          <StatusBar game={game} />
+          <ColonistPanel colonists={game.colonists} />
+          <TaskPanel tasks={game.tasks} />
+          <AlertLog messages={game.messages} />
+        </>
+      )}
+      
+      {showHelp && (
+        <HelpOverlay onClose={() => setShowHelp(false)} />
+      )}
+    </div>
+  );
+}
