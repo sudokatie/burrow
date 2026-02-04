@@ -1,36 +1,70 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Burrow
 
-## Getting Started
+A Dwarf Fortress-inspired colony survival game with ASCII visuals. Manage colonists, designate tasks, and try to keep everyone alive.
 
-First, run the development server:
+Built with Next.js, TypeScript, and Canvas. No external game libraries - just vanilla rendering and a lot of pathfinding.
+
+## What It Does
+
+Drop 3 colonists into a procedurally generated world. They have needs (hunger, rest, mood) and skills (mining, construction, cooking). You designate areas to mine, trees to chop, and things to build. Colonists figure out the rest - mostly.
+
+The AI isn't fancy. Colonists pathfind to tasks, work until they're done or starving, then go find food. Night makes everything darker. Day makes it brighter. The loop continues until everyone dies or you get bored.
+
+## Controls
+
+- **D** - Cycle through designation modes (mine, chop, stockpile)
+- **B** - Toggle build mode, cycle through building types
+- **S** - Cancel all designations/builds
+- **Space** - Pause/unpause
+- **Escape** - Return to title screen
+- **?** - Show help overlay
+
+Click and drag to select areas for designation. Click to place buildings.
+
+## Running It
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000 in a browser.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Testing
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm test
+```
 
-## Learn More
+241 tests covering world generation, pathfinding, colonist needs, task assignment, and building construction. The game logic is fully tested. The rendering isn't - you'll have to trust that Canvas works.
 
-To learn more about Next.js, take a look at the following resources:
+## Project Structure
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```
+src/
+  game/        # Core game logic
+    types.ts   # All the interfaces and enums
+    World.ts   # Map generation and tile operations
+    Colonist.ts # Need decay, skills, traits
+    Task.ts    # Task creation and assignment
+    Resource.ts # Item stacking and management
+    Building.ts # Construction and materials
+    Pathfinding.ts # A* algorithm
+    Time.ts    # Day/night cycle
+    Game.ts    # Main game state orchestration
+    Renderer.ts # ASCII canvas rendering
+  components/  # React UI overlays
+  __tests__/   # Jest tests
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Technical Notes
 
-## Deploy on Vercel
+- World is 64x48 tiles, rendered to a 1024x768 canvas
+- Pathfinding uses A* with Manhattan distance heuristic
+- Game loop runs via requestAnimationFrame, capped at 100ms delta
+- Colonist AI is simple priority-based: hungry? eat. tired? sleep. otherwise work.
+- Night renders a semi-transparent overlay. Fancy.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## License
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+MIT

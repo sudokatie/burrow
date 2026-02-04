@@ -29,6 +29,12 @@ export default function GameCanvas() {
   const [dragEnd, setDragEnd] = useState<Position | null>(null);
   
   const lastTimeRef = useRef<number>(0);
+  const gameRef = useRef<GameState>(game);
+  
+  // Keep ref in sync with state
+  useEffect(() => {
+    gameRef.current = game;
+  }, [game]);
   
   // Game loop
   useEffect(() => {
@@ -43,8 +49,9 @@ export default function GameCanvas() {
       // Limit dt to prevent huge jumps
       const clampedDt = Math.min(dt, 0.1);
       
-      updateGame(game, clampedDt);
-      setGame({ ...game });
+      const currentGame = gameRef.current;
+      updateGame(currentGame, clampedDt);
+      setGame({ ...currentGame });
       
       animationId = requestAnimationFrame(loop);
     };
