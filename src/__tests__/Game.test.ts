@@ -8,6 +8,7 @@ import {
   addMessage,
   setDesignMode,
   setSelectedBuild,
+  setSelectedPriority,
   designateArea,
   processColonistAI,
   spawnForageItems,
@@ -47,6 +48,27 @@ describe('createGame', () => {
     expect(game.messages).toHaveLength(0);
     expect(game.designMode).toBe(DesignMode.NONE);
     expect(game.selectedBuild).toBeNull();
+    expect(game.selectedPriority).toBe(5);
+  });
+});
+
+describe('setSelectedPriority', () => {
+  test('sets priority value', () => {
+    const game = createGame();
+    setSelectedPriority(game, 3);
+    expect(game.selectedPriority).toBe(3);
+  });
+
+  test('clamps priority to minimum 1', () => {
+    const game = createGame();
+    setSelectedPriority(game, 0);
+    expect(game.selectedPriority).toBe(1);
+  });
+
+  test('clamps priority to maximum 9', () => {
+    const game = createGame();
+    setSelectedPriority(game, 15);
+    expect(game.selectedPriority).toBe(9);
   });
 });
 

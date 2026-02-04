@@ -78,10 +78,10 @@ describe('Pathfinding', () => {
   });
 
   describe('getNeighbors', () => {
-    it('returns 4 neighbors in open space', () => {
+    it('returns 8 neighbors in open space (includes diagonals)', () => {
       const world = createWorld(WORLD_WIDTH, WORLD_HEIGHT);
       const neighbors = getNeighbors(world, { x: 5, y: 5 });
-      expect(neighbors).toHaveLength(4);
+      expect(neighbors).toHaveLength(8);
     });
 
     it('excludes unwalkable tiles', () => {
@@ -90,21 +90,28 @@ describe('Pathfinding', () => {
       world[6][5].type = TileType.WALL; // Below
       
       const neighbors = getNeighbors(world, { x: 5, y: 5 });
-      expect(neighbors).toHaveLength(2); // Only left and right
+      // Left, right, and 4 diagonals = 6
+      expect(neighbors).toHaveLength(6);
     });
 
     it('excludes out of bounds', () => {
       const world = createWorld(WORLD_WIDTH, WORLD_HEIGHT);
       const neighbors = getNeighbors(world, { x: 0, y: 0 });
-      expect(neighbors).toHaveLength(2); // Only right and down
+      // Right, down, and down-right diagonal = 3
+      expect(neighbors).toHaveLength(3);
     });
 
     it('returns empty for fully blocked position', () => {
       const world = createWorld(WORLD_WIDTH, WORLD_HEIGHT);
-      world[4][5].type = TileType.ROCK;
-      world[6][5].type = TileType.ROCK;
-      world[5][4].type = TileType.ROCK;
-      world[5][6].type = TileType.ROCK;
+      // Block all 8 directions
+      world[4][5].type = TileType.ROCK; // up
+      world[6][5].type = TileType.ROCK; // down
+      world[5][4].type = TileType.ROCK; // left
+      world[5][6].type = TileType.ROCK; // right
+      world[4][4].type = TileType.ROCK; // up-left
+      world[4][6].type = TileType.ROCK; // up-right
+      world[6][4].type = TileType.ROCK; // down-left
+      world[6][6].type = TileType.ROCK; // down-right
       
       const neighbors = getNeighbors(world, { x: 5, y: 5 });
       expect(neighbors).toHaveLength(0);
@@ -127,10 +134,11 @@ describe('Pathfinding', () => {
       expect(path[path.length - 1]).toEqual({ x: 8, y: 5 });
     });
 
-    it('returns optimal path length', () => {
+    it('returns optimal path length with diagonals', () => {
       const world = createWorld(WORLD_WIDTH, WORLD_HEIGHT);
       const path = findPath(world, { x: 0, y: 0 }, { x: 3, y: 2 });
-      expect(path).toHaveLength(6); // 3 right + 2 down + 1 start
+      // With diagonals: 2 diagonal + 1 horizontal = 4 positions (including start)
+      expect(path).toHaveLength(4);
     });
 
     it('navigates around obstacles', () => {
@@ -176,13 +184,17 @@ describe('Pathfinding', () => {
       expect(path[path.length - 1]).toEqual({ x: 5, y: 5 });
     });
 
-    it('each step is adjacent to previous', () => {
+    it('each step is adjacent to previous (including diagonals)', () => {
       const world = createWorld(WORLD_WIDTH, WORLD_HEIGHT);
       const path = findPath(world, { x: 0, y: 0 }, { x: 10, y: 10 });
       
       for (let i = 1; i < path.length; i++) {
-        const dist = getDistance(path[i-1], path[i]);
-        expect(dist).toBe(1);
+        const dx = Math.abs(path[i].x - path[i-1].x);
+        const dy = Math.abs(path[i].y - path[i-1].y);
+        // Each step should be at most 1 tile away in both x and y (allows diagonal)
+        expect(dx).toBeLessThanOrEqual(1);
+        expect(dy).toBeLessThanOrEqual(1);
+        expect(dx + dy).toBeGreaterThan(0); // Must move at least 1
       }
     });
   });

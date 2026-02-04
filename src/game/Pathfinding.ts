@@ -18,10 +18,14 @@ export function heuristic(a: Position, b: Position): number {
 export function getNeighbors(world: Tile[][], pos: Position): Position[] {
   const neighbors: Position[] = [];
   const directions = [
-    { x: 0, y: -1 }, // up
-    { x: 0, y: 1 },  // down
-    { x: -1, y: 0 }, // left
-    { x: 1, y: 0 },  // right
+    { x: 0, y: -1 },  // up
+    { x: 0, y: 1 },   // down
+    { x: -1, y: 0 },  // left
+    { x: 1, y: 0 },   // right
+    { x: -1, y: -1 }, // up-left (diagonal)
+    { x: 1, y: -1 },  // up-right (diagonal)
+    { x: -1, y: 1 },  // down-left (diagonal)
+    { x: 1, y: 1 },   // down-right (diagonal)
   ];
 
   for (const dir of directions) {

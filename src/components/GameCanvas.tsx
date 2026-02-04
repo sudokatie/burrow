@@ -10,6 +10,7 @@ import {
   togglePause,
   setDesignMode,
   setSelectedBuild,
+  setSelectedPriority,
   designateArea,
 } from '../game/Game';
 import { renderGame, renderSelection } from '../game/Renderer';
@@ -129,6 +130,19 @@ export default function GameCanvas() {
         case '?':
           setShowHelp(true);
           break;
+          
+        case '1':
+        case '2':
+        case '3':
+        case '4':
+        case '5':
+        case '6':
+        case '7':
+        case '8':
+        case '9':
+          setSelectedPriority(game, parseInt(e.key));
+          setGame({ ...game });
+          break;
       }
     };
     
@@ -175,6 +189,15 @@ export default function GameCanvas() {
     setDragEnd(null);
   }, [dragStart, dragEnd, game]);
   
+  const handleContextMenu = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    // Right-click cancels current mode
+    setDesignMode(game, DesignMode.NONE);
+    setDragStart(null);
+    setDragEnd(null);
+    setGame({ ...game });
+  }, [game]);
+  
   // Game start handler
   const handleStart = useCallback(() => {
     startGame(game);
@@ -191,6 +214,7 @@ export default function GameCanvas() {
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
+        onContextMenu={handleContextMenu}
         onMouseLeave={() => {
           setDragStart(null);
           setDragEnd(null);

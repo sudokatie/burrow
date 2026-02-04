@@ -6,6 +6,7 @@ import {
   updateNeeds,
   satisfyNeed,
   getWorkSpeed,
+  getMovementSpeed,
   setColonistState,
   getNeedStatus,
   isColonistCritical,
@@ -170,6 +171,40 @@ describe('Colonist', () => {
       
       const speed = getWorkSpeed(colonist, TaskType.MINE);
       expect(speed).toBeCloseTo(0.8, 1);
+    });
+
+    it('halves work speed when mood is 0', () => {
+      const colonist = createColonist('Test', { x: 0, y: 0 });
+      colonist.skills.mining = 0;
+      colonist.trait = Trait.OPTIMIST;
+      colonist.needs.mood = 0;
+      
+      const speed = getWorkSpeed(colonist, TaskType.MINE);
+      expect(speed).toBeCloseTo(0.5, 1);
+    });
+
+    it('normal work speed when mood is positive', () => {
+      const colonist = createColonist('Test', { x: 0, y: 0 });
+      colonist.skills.mining = 0;
+      colonist.trait = Trait.OPTIMIST;
+      colonist.needs.mood = 50;
+      
+      const speed = getWorkSpeed(colonist, TaskType.MINE);
+      expect(speed).toBeCloseTo(1.0, 1);
+    });
+  });
+
+  describe('getMovementSpeed', () => {
+    it('returns 1.0 when rest is positive', () => {
+      const colonist = createColonist('Test', { x: 0, y: 0 });
+      colonist.needs.rest = 50;
+      expect(getMovementSpeed(colonist)).toBe(1.0);
+    });
+
+    it('returns 0.5 when rest is 0', () => {
+      const colonist = createColonist('Test', { x: 0, y: 0 });
+      colonist.needs.rest = 0;
+      expect(getMovementSpeed(colonist)).toBe(0.5);
     });
   });
 

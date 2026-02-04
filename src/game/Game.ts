@@ -37,6 +37,7 @@ import {
   updateNeeds,
   satisfyNeed,
   getWorkSpeed,
+  getMovementSpeed,
   setColonistState,
   isColonistDead,
   moveColonist,
@@ -56,8 +57,9 @@ import {
   removeTask,
 } from './Task';
 import { findPath } from './Pathfinding';
-import { canBuild, build, createStockpile } from './Building';
-import { getNearestItem } from './Resource';
+import { canBuild, build, createStockpile, getBuildCost, hasMaterials, consumeMaterials } from './Building';
+import { getNearestItem, createItem } from './Resource';
+import { findNearestStockpileSpace, isInStockpile } from './Building';
 
 let lastForageTime = 0;
 
@@ -75,7 +77,12 @@ export function createGame(): GameState {
     messages: [],
     designMode: DesignMode.NONE,
     selectedBuild: null,
+    selectedPriority: 5,
   };
+}
+
+export function setSelectedPriority(game: GameState, priority: number): void {
+  game.selectedPriority = Math.max(1, Math.min(9, priority));
 }
 
 export function startGame(game: GameState): void {
@@ -218,8 +225,8 @@ export function designateArea(game: GameState, start: Position, end: Position): 
       
       if (taskType) {
         if (designateTile(game.world, x, y, taskType)) {
-          // Create task for this designation
-          const task = createTask(taskType, { x, y });
+          // Create task for this designation with selected priority
+          const task = createTask(taskType, { x, y }, game.selectedPriority);
           game.tasks.push(task);
         }
       }
@@ -287,6 +294,9 @@ export function assignTasks(game: GameState): void {
   }
 }
 
+// Track movement cooldown per colonist
+const movementCooldowns = new Map<string, number>();
+
 export function processWork(game: GameState, dt: number): void {
   for (const colonist of game.colonists) {
     if (colonist.state !== ColonistState.WORKING) continue;
@@ -300,10 +310,20 @@ export function processWork(game: GameState, dt: number): void {
     
     // Move along path if not at task location
     if (colonist.path.length > 1) {
-      // Move toward next path node
-      const next = colonist.path[1];
-      moveColonist(colonist, next);
-      colonist.path.shift();
+      // Apply movement speed (rest penalty)
+      const moveSpeed = getMovementSpeed(colonist);
+      const cooldown = movementCooldowns.get(colonist.id) || 0;
+      const newCooldown = cooldown - dt * moveSpeed;
+      
+      if (newCooldown <= 0) {
+        // Move toward next path node
+        const next = colonist.path[1];
+        moveColonist(colonist, next);
+        colonist.path.shift();
+        movementCooldowns.set(colonist.id, 0.1); // Base 100ms between moves
+      } else {
+        movementCooldowns.set(colonist.id, newCooldown);
+      }
       continue;
     }
     
@@ -335,8 +355,37 @@ function completeTask(game: GameState, task: Task, colonist: Colonist): void {
       addMessage(game, `${colonist.name} finished chopping`);
       break;
     }
+    case TaskType.HAUL: {
+      // Pick up item and place in stockpile
+      const item = removeItem(game.world, task.pos.x, task.pos.y);
+      if (item) {
+        const stockpilePos = findNearestStockpileSpace(game.world, game.stockpiles, colonist.pos);
+        if (stockpilePos) {
+          placeItem(game.world, stockpilePos.x, stockpilePos.y, item);
+          addMessage(game, `${colonist.name} hauled ${item.type.toLowerCase()}`);
+        } else {
+          // No space, drop it back
+          placeItem(game.world, task.pos.x, task.pos.y, item);
+        }
+      }
+      break;
+    }
+    case TaskType.COOK: {
+      // Consume raw food, produce meal
+      const rawFood = removeItem(game.world, task.pos.x, task.pos.y);
+      if (rawFood && rawFood.type === ItemType.RAW_FOOD) {
+        placeItem(game.world, task.pos.x, task.pos.y, createItem(ItemType.MEAL, 1));
+        addMessage(game, `${colonist.name} cooked a meal`);
+      }
+      break;
+    }
     case TaskType.BUILD: {
       if (task.buildType) {
+        const cost = getBuildCost(task.buildType);
+        // Check and consume materials (stockpile has none = free for now, but correct flow)
+        if (hasMaterials(game.world, game.stockpiles, cost)) {
+          consumeMaterials(game.world, game.stockpiles, cost);
+        }
         build(game.world, task.pos.x, task.pos.y, task.buildType);
         addMessage(game, `${colonist.name} finished building ${task.buildType.toLowerCase()}`);
       }
@@ -386,16 +435,16 @@ export function processColonistAI(game: GameState, colonist: Colonist): void {
   
   // Priority 1: Eat if hungry
   if (isHungry(colonist)) {
-    const foodPos = getNearestItem(game.world, colonist.pos, ItemType.MEAL);
-    if (!foodPos) {
-      // Try raw food
-      const rawFoodPos = getNearestItem(game.world, colonist.pos, ItemType.RAW_FOOD);
-      if (rawFoodPos) {
-        createAndAssignEatTask(game, colonist, rawFoodPos);
-        return;
-      }
-    } else {
-      createAndAssignEatTask(game, colonist, foodPos);
+    // Prefer cooked meals
+    const mealPos = getNearestItem(game.world, colonist.pos, ItemType.MEAL);
+    if (mealPos) {
+      createAndAssignEatTask(game, colonist, mealPos);
+      return;
+    }
+    // Fall back to raw food
+    const rawFoodPos = getNearestItem(game.world, colonist.pos, ItemType.RAW_FOOD);
+    if (rawFoodPos) {
+      createAndAssignEatTask(game, colonist, rawFoodPos);
       return;
     }
   }
@@ -407,20 +456,12 @@ export function processColonistAI(game: GameState, colonist: Colonist): void {
     return;
   }
   
-  // Priority 3: Find unassigned task
+  // Priority 3: Find unassigned task (user-designated)
   const unassigned = getUnassignedTasks(game.tasks);
   if (unassigned.length > 0) {
-    // Find nearest task
-    let nearest: Task | null = null;
-    let nearestDist = Infinity;
-    
-    for (const task of unassigned) {
-      const dist = Math.abs(colonist.pos.x - task.pos.x) + Math.abs(colonist.pos.y - task.pos.y);
-      if (dist < nearestDist) {
-        nearestDist = dist;
-        nearest = task;
-      }
-    }
+    // Sort by priority (lower number = higher priority)
+    const sortedTasks = [...unassigned].sort((a, b) => a.priority - b.priority);
+    const nearest = findNearestTask(colonist.pos, sortedTasks);
     
     if (nearest) {
       assignTaskToTask(nearest, colonist.id);
@@ -429,8 +470,92 @@ export function processColonistAI(game: GameState, colonist: Colonist): void {
       
       const path = findPath(game.world, colonist.pos, nearest.pos);
       setColonistPath(colonist, path);
+      return;
     }
   }
+  
+  // Priority 4: Auto-haul items to stockpiles
+  if (game.stockpiles.length > 0) {
+    const haulPos = findItemToHaul(game);
+    if (haulPos) {
+      const task = createTask(TaskType.HAUL, haulPos, 8); // Low priority
+      game.tasks.push(task);
+      assignTaskToTask(task, colonist.id);
+      colonist.currentTask = task.id;
+      setColonistState(colonist, ColonistState.WORKING);
+      
+      const path = findPath(game.world, colonist.pos, haulPos);
+      setColonistPath(colonist, path);
+      return;
+    }
+  }
+  
+  // Priority 5: Auto-cook raw food in stockpiles
+  const cookPos = findRawFoodToCook(game);
+  if (cookPos) {
+    const task = createTask(TaskType.COOK, cookPos, 7); // Medium-low priority
+    game.tasks.push(task);
+    assignTaskToTask(task, colonist.id);
+    colonist.currentTask = task.id;
+    setColonistState(colonist, ColonistState.WORKING);
+    
+    const path = findPath(game.world, colonist.pos, cookPos);
+    setColonistPath(colonist, path);
+    return;
+  }
+}
+
+function findNearestTask(pos: Position, tasks: Task[]): Task | null {
+  let nearest: Task | null = null;
+  let nearestDist = Infinity;
+  
+  for (const task of tasks) {
+    const dist = Math.abs(pos.x - task.pos.x) + Math.abs(pos.y - task.pos.y);
+    if (dist < nearestDist) {
+      nearestDist = dist;
+      nearest = task;
+    }
+  }
+  
+  return nearest;
+}
+
+function findItemToHaul(game: GameState): Position | null {
+  // Find items on the ground that are NOT in stockpiles
+  for (let y = 0; y < game.world.length; y++) {
+    for (let x = 0; x < game.world[y].length; x++) {
+      const tile = game.world[y][x];
+      if (tile.item && !isInStockpile(game.stockpiles, { x, y })) {
+        // Check not already being hauled
+        const alreadyTasked = game.tasks.some(
+          t => t.type === TaskType.HAUL && t.pos.x === x && t.pos.y === y
+        );
+        if (!alreadyTasked) {
+          return { x, y };
+        }
+      }
+    }
+  }
+  return null;
+}
+
+function findRawFoodToCook(game: GameState): Position | null {
+  // Find raw food in stockpiles to cook
+  for (const stockpile of game.stockpiles) {
+    for (const pos of stockpile.tiles) {
+      const tile = game.world[pos.y]?.[pos.x];
+      if (tile?.item?.type === ItemType.RAW_FOOD) {
+        // Check not already being cooked
+        const alreadyTasked = game.tasks.some(
+          t => t.type === TaskType.COOK && t.pos.x === pos.x && t.pos.y === pos.y
+        );
+        if (!alreadyTasked) {
+          return { x: pos.x, y: pos.y };
+        }
+      }
+    }
+  }
+  return null;
 }
 
 function createAndAssignEatTask(game: GameState, colonist: Colonist, foodPos: Position): void {

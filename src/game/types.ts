@@ -137,4 +137,5 @@ export interface GameState {
   messages: string[];
   designMode: DesignMode;
   selectedBuild: BuildType | null;
+  selectedPriority: number;
 }

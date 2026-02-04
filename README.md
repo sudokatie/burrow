@@ -12,12 +12,14 @@ The AI isn't fancy. Colonists pathfind to tasks, work until they're done or star
 
 ## Controls
 
-- **D** - Cycle through designation modes (mine, chop, stockpile)
-- **B** - Toggle build mode, cycle through building types
-- **S** - Cancel all designations/builds
+- **D** - Cycle through designation modes (mine, chop)
+- **B** - Toggle build mode, cycle through building types (wall, floor, door, bed)
+- **S** - Stockpile mode
 - **Space** - Pause/unpause
-- **Escape** - Return to title screen
+- **Escape** - Cancel current mode
 - **?** - Show help overlay
+- **1-9** - Set task priority (lower = higher priority)
+- **Right-click** - Cancel current mode
 
 Click and drag to select areas for designation. Click to place buildings.
 
@@ -36,7 +38,7 @@ Open http://localhost:3000 in a browser.
 npm test
 ```
 
-241 tests covering world generation, pathfinding, colonist needs, task assignment, and building construction. The game logic is fully tested. The rendering isn't - you'll have to trust that Canvas works.
+248 tests covering world generation, pathfinding, colonist needs, task assignment, and building construction. The game logic is fully tested. The rendering isn't - you'll have to trust that Canvas works.
 
 ## Project Structure
 
@@ -60,9 +62,10 @@ src/
 ## Technical Notes
 
 - World is 64x48 tiles, rendered to a 1024x768 canvas
-- Pathfinding uses A* with Manhattan distance heuristic
+- Pathfinding uses A* with Manhattan distance heuristic and diagonal movement
 - Game loop runs via requestAnimationFrame, capped at 100ms delta
-- Colonist AI is simple priority-based: hungry? eat. tired? sleep. otherwise work.
+- Colonist AI is priority-based: hungry? eat. tired? sleep. haul items? cook food? otherwise work.
+- Rest at 0 halves movement speed. Mood at 0 halves work speed.
 - Night renders a semi-transparent overlay. Fancy.
 
 ## License

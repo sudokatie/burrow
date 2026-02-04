@@ -109,7 +109,15 @@ export function getWorkSpeed(colonist: Colonist, taskType: TaskType): number {
   // Trait bonus
   const traitBonus = TRAIT_WORK_MODIFIER[colonist.trait];
   
-  return baseSpeed * (1 + skillBonus + traitBonus);
+  // Mood penalty - work speed halved at 0 mood
+  const moodPenalty = colonist.needs.mood <= 0 ? 0.5 : 1.0;
+  
+  return baseSpeed * (1 + skillBonus + traitBonus) * moodPenalty;
+}
+
+export function getMovementSpeed(colonist: Colonist): number {
+  // Rest penalty - movement speed halved at 0 rest
+  return colonist.needs.rest <= 0 ? 0.5 : 1.0;
 }
 
 export function setColonistState(colonist: Colonist, state: ColonistState): void {
