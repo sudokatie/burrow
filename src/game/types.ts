@@ -124,12 +124,19 @@ export interface Stockpile {
   tiles: Position[];
 }
 
+export interface Bed {
+  id: string;
+  pos: Position;
+  occupiedBy: string | null;
+}
+
 export interface GameState {
   screen: GameScreen;
   world: Tile[][];
   colonists: Colonist[];
   tasks: Task[];
   stockpiles: Stockpile[];
+  beds: Bed[];
   day: number;
   hour: number;
   minute: number;

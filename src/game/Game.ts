@@ -57,7 +57,7 @@ import {
   removeTask,
 } from './Task';
 import { findPath } from './Pathfinding';
-import { canBuild, build, createStockpile, getBuildCost, hasMaterials, consumeMaterials } from './Building';
+import { canBuild, build, createStockpile, getBuildCost, hasMaterials, consumeMaterials, createBed, findNearestAvailableBed, occupyBed, vacateBed, getBedAt } from './Building';
 import { getNearestItem, createItem } from './Resource';
 import { findNearestStockpileSpace, isInStockpile } from './Building';
 
@@ -70,6 +70,7 @@ export function createGame(): GameState {
     colonists: [],
     tasks: [],
     stockpiles: [],
+    beds: [],
     day: 1,
     hour: 8,
     minute: 0,
@@ -126,6 +127,9 @@ export function updateGame(game: GameState, dt: number): void {
         const task = game.tasks.find(t => t.id === c.currentTask);
         if (task) unassignTask(task);
       }
+      // Vacate any bed they were using
+      const bed = game.beds.find(b => b.occupiedBy === c.id);
+      if (bed) vacateBed(bed);
       return false;
     }
     return true;
@@ -299,6 +303,25 @@ const movementCooldowns = new Map<string, number>();
 
 export function processWork(game: GameState, dt: number): void {
   for (const colonist of game.colonists) {
+    // Handle movement for MOVING state
+    if (colonist.state === ColonistState.MOVING) {
+      if (colonist.path.length > 1) {
+        const moveSpeed = getMovementSpeed(colonist);
+        const cooldown = movementCooldowns.get(colonist.id) || 0;
+        const newCooldown = cooldown - dt * moveSpeed;
+        
+        if (newCooldown <= 0) {
+          const next = colonist.path[1];
+          moveColonist(colonist, next);
+          colonist.path.shift();
+          movementCooldowns.set(colonist.id, 0.1);
+        } else {
+          movementCooldowns.set(colonist.id, newCooldown);
+        }
+      }
+      continue;
+    }
+    
     if (colonist.state !== ColonistState.WORKING) continue;
     if (!colonist.currentTask) continue;
     
@@ -308,19 +331,17 @@ export function processWork(game: GameState, dt: number): void {
       continue;
     }
     
-    // Move along path if not at task location
+    // Move along path if not at task location (legacy - for eating state)
     if (colonist.path.length > 1) {
-      // Apply movement speed (rest penalty)
       const moveSpeed = getMovementSpeed(colonist);
       const cooldown = movementCooldowns.get(colonist.id) || 0;
       const newCooldown = cooldown - dt * moveSpeed;
       
       if (newCooldown <= 0) {
-        // Move toward next path node
         const next = colonist.path[1];
         moveColonist(colonist, next);
         colonist.path.shift();
-        movementCooldowns.set(colonist.id, 0.1); // Base 100ms between moves
+        movementCooldowns.set(colonist.id, 0.1);
       } else {
         movementCooldowns.set(colonist.id, newCooldown);
       }
@@ -387,6 +408,13 @@ function completeTask(game: GameState, task: Task, colonist: Colonist): void {
           consumeMaterials(game.world, game.stockpiles, cost);
         }
         build(game.world, task.pos.x, task.pos.y, task.buildType);
+        
+        // Create bed entity if building a bed
+        if (task.buildType === BuildType.BED) {
+          const bed = createBed(task.pos);
+          game.beds.push(bed);
+        }
+        
         addMessage(game, `${colonist.name} finished building ${task.buildType.toLowerCase()}`);
       }
       break;
@@ -410,11 +438,51 @@ function completeTask(game: GameState, task: Task, colonist: Colonist): void {
 export function processColonistAI(game: GameState, colonist: Colonist): void {
   // Handle sleeping
   if (colonist.state === ColonistState.SLEEPING) {
-    satisfyNeed(colonist, 'rest', SLEEP_REST_PER_SECOND);
+    // Check if sleeping in a bed (bonus rest) or on ground (half rest)
+    const bedAtPos = getBedAt(game.beds, colonist.pos);
+    const restRate = bedAtPos && bedAtPos.occupiedBy === colonist.id 
+      ? SLEEP_REST_PER_SECOND 
+      : SLEEP_REST_PER_SECOND * 0.5;
+    
+    satisfyNeed(colonist, 'rest', restRate);
+    
     if (colonist.needs.rest >= 100) {
+      // Vacate bed if using one
+      if (bedAtPos && bedAtPos.occupiedBy === colonist.id) {
+        vacateBed(bedAtPos);
+      }
       setColonistState(colonist, ColonistState.IDLE);
       clearColonistPath(colonist);
       addMessage(game, `${colonist.name} woke up`);
+    }
+    return;
+  }
+  
+  // Handle moving to destination (separate from working)
+  if (colonist.state === ColonistState.MOVING) {
+    // Movement handled in processWork, but check if arrived
+    if (colonist.path.length <= 1) {
+      // Arrived at destination - transition based on task
+      if (colonist.currentTask) {
+        const task = game.tasks.find(t => t.id === colonist.currentTask);
+        if (task && task.type === TaskType.SLEEP) {
+          // Arrived at bed - start sleeping
+          const bed = getBedAt(game.beds, colonist.pos);
+          if (bed) {
+            occupyBed(bed, colonist.id);
+          }
+          setColonistState(colonist, ColonistState.SLEEPING);
+          game.tasks = removeTask(game.tasks, task.id);
+          colonist.currentTask = null;
+          addMessage(game, `${colonist.name} went to sleep`);
+          return;
+        } else {
+          // Arrived at work task - start working
+          setColonistState(colonist, ColonistState.WORKING);
+        }
+      } else {
+        setColonistState(colonist, ColonistState.IDLE);
+      }
     }
     return;
   }
@@ -449,10 +517,26 @@ export function processColonistAI(game: GameState, colonist: Colonist): void {
     }
   }
   
-  // Priority 2: Sleep if tired
+  // Priority 2: Sleep if tired - prefer beds
   if (isTired(colonist)) {
+    const bed = findNearestAvailableBed(game.beds, colonist.pos);
+    if (bed) {
+      // Create sleep task and move to bed
+      const task = createTask(TaskType.SLEEP, bed.pos, 1);
+      game.tasks.push(task);
+      assignTaskToTask(task, colonist.id);
+      colonist.currentTask = task.id;
+      
+      const path = findPath(game.world, colonist.pos, bed.pos);
+      if (path.length > 0) {
+        setColonistPath(colonist, path);
+        setColonistState(colonist, ColonistState.MOVING);
+        return;
+      }
+    }
+    // No bed available - sleep on ground
     setColonistState(colonist, ColonistState.SLEEPING);
-    addMessage(game, `${colonist.name} went to sleep`);
+    addMessage(game, `${colonist.name} collapsed from exhaustion`);
     return;
   }
   
@@ -466,10 +550,15 @@ export function processColonistAI(game: GameState, colonist: Colonist): void {
     if (nearest) {
       assignTaskToTask(nearest, colonist.id);
       colonist.currentTask = nearest.id;
-      setColonistState(colonist, ColonistState.WORKING);
       
       const path = findPath(game.world, colonist.pos, nearest.pos);
       setColonistPath(colonist, path);
+      // Use MOVING state if not already at destination
+      if (path.length > 1) {
+        setColonistState(colonist, ColonistState.MOVING);
+      } else {
+        setColonistState(colonist, ColonistState.WORKING);
+      }
       return;
     }
   }
@@ -482,10 +571,14 @@ export function processColonistAI(game: GameState, colonist: Colonist): void {
       game.tasks.push(task);
       assignTaskToTask(task, colonist.id);
       colonist.currentTask = task.id;
-      setColonistState(colonist, ColonistState.WORKING);
       
       const path = findPath(game.world, colonist.pos, haulPos);
       setColonistPath(colonist, path);
+      if (path.length > 1) {
+        setColonistState(colonist, ColonistState.MOVING);
+      } else {
+        setColonistState(colonist, ColonistState.WORKING);
+      }
       return;
     }
   }
@@ -497,10 +590,14 @@ export function processColonistAI(game: GameState, colonist: Colonist): void {
     game.tasks.push(task);
     assignTaskToTask(task, colonist.id);
     colonist.currentTask = task.id;
-    setColonistState(colonist, ColonistState.WORKING);
     
     const path = findPath(game.world, colonist.pos, cookPos);
     setColonistPath(colonist, path);
+    if (path.length > 1) {
+      setColonistState(colonist, ColonistState.MOVING);
+    } else {
+      setColonistState(colonist, ColonistState.WORKING);
+    }
     return;
   }
 }

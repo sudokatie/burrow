@@ -1,8 +1,9 @@
-import { Tile, TileType, BuildType, Position, Stockpile, ItemType } from './types';
+import { Tile, TileType, BuildType, Position, Stockpile, ItemType, Bed } from './types';
 import { BUILD_COSTS } from './constants';
 import { getItemAt } from './Resource';
 
 let stockpileIdCounter = 0;
+let bedIdCounter = 0;
 
 export function canBuild(world: Tile[][], x: number, y: number, type: BuildType): boolean {
   if (y < 0 || y >= world.length) return false;
@@ -158,4 +159,45 @@ export function findNearestStockpileSpace(
 
 export function resetStockpileIdCounter(): void {
   stockpileIdCounter = 0;
+}
+
+export function createBed(pos: Position): Bed {
+  return {
+    id: `bed-${++bedIdCounter}`,
+    pos: { ...pos },
+    occupiedBy: null,
+  };
+}
+
+export function findNearestAvailableBed(beds: Bed[], pos: Position): Bed | null {
+  let nearest: Bed | null = null;
+  let nearestDist = Infinity;
+
+  for (const bed of beds) {
+    if (bed.occupiedBy === null) {
+      const dist = Math.abs(bed.pos.x - pos.x) + Math.abs(bed.pos.y - pos.y);
+      if (dist < nearestDist) {
+        nearestDist = dist;
+        nearest = bed;
+      }
+    }
+  }
+
+  return nearest;
+}
+
+export function occupyBed(bed: Bed, colonistId: string): void {
+  bed.occupiedBy = colonistId;
+}
+
+export function vacateBed(bed: Bed): void {
+  bed.occupiedBy = null;
+}
+
+export function getBedAt(beds: Bed[], pos: Position): Bed | null {
+  return beds.find(b => b.pos.x === pos.x && b.pos.y === pos.y) || null;
+}
+
+export function resetBedIdCounter(): void {
+  bedIdCounter = 0;
 }

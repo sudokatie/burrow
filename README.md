@@ -38,7 +38,7 @@ Open http://localhost:3000 in a browser.
 npm test
 ```
 
-248 tests covering world generation, pathfinding, colonist needs, task assignment, and building construction. The game logic is fully tested. The rendering isn't - you'll have to trust that Canvas works.
+260 tests covering world generation, pathfinding, colonist needs, task assignment, building construction, and bed mechanics. The game logic is fully tested. The rendering isn't - you'll have to trust that Canvas works.
 
 ## Project Structure
 
@@ -64,8 +64,10 @@ src/
 - World is 64x48 tiles, rendered to a 1024x768 canvas
 - Pathfinding uses A* with Manhattan distance heuristic and diagonal movement
 - Game loop runs via requestAnimationFrame, capped at 100ms delta
-- Colonist AI is priority-based: hungry? eat. tired? sleep. haul items? cook food? otherwise work.
+- Colonist AI is priority-based: hungry? eat. tired? find bed and sleep. haul items? cook food? otherwise work.
+- Beds provide 2x rest recovery. No bed? Sleep on the ground at half rate.
 - Rest at 0 halves movement speed. Mood at 0 halves work speed.
+- Colonists use MOVING state when walking to destinations, WORKING when at task.
 - Night renders a semi-transparent overlay. Fancy.
 
 ## License

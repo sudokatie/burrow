@@ -8,9 +8,15 @@ import {
   isInStockpile,
   findNearestStockpileSpace,
   resetStockpileIdCounter,
+  createBed,
+  findNearestAvailableBed,
+  occupyBed,
+  vacateBed,
+  getBedAt,
+  resetBedIdCounter,
 } from '../game/Building';
 import { createItem } from '../game/Resource';
-import { TileType, BuildType, Tile, ItemType, Stockpile } from '../game/types';
+import { TileType, BuildType, Tile, ItemType, Stockpile, Bed } from '../game/types';
 
 function createEmptyTile(type: TileType = TileType.GRASS): Tile {
   return { type, designation: null, item: null };
@@ -30,6 +36,7 @@ function createWorld(width: number, height: number): Tile[][] {
 describe('Building System', () => {
   beforeEach(() => {
     resetStockpileIdCounter();
+    resetBedIdCounter();
   });
 
   describe('canBuild', () => {
@@ -260,6 +267,96 @@ describe('Building System', () => {
     it('returns null for empty stockpiles', () => {
       const world = createWorld(10, 10);
       expect(findNearestStockpileSpace(world, [], { x: 5, y: 5 })).toBeNull();
+    });
+  });
+
+  describe('createBed', () => {
+    it('creates bed at position', () => {
+      const bed = createBed({ x: 5, y: 5 });
+      expect(bed.id).toMatch(/^bed-/);
+      expect(bed.pos).toEqual({ x: 5, y: 5 });
+      expect(bed.occupiedBy).toBeNull();
+    });
+
+    it('generates unique ids', () => {
+      const b1 = createBed({ x: 0, y: 0 });
+      const b2 = createBed({ x: 1, y: 1 });
+      expect(b1.id).not.toBe(b2.id);
+    });
+
+    it('copies position to avoid mutation', () => {
+      const pos = { x: 5, y: 5 };
+      const bed = createBed(pos);
+      pos.x = 99;
+      expect(bed.pos.x).toBe(5);
+    });
+  });
+
+  describe('occupyBed and vacateBed', () => {
+    it('occupies bed with colonist id', () => {
+      const bed = createBed({ x: 5, y: 5 });
+      occupyBed(bed, 'colonist_1');
+      expect(bed.occupiedBy).toBe('colonist_1');
+    });
+
+    it('vacates bed', () => {
+      const bed = createBed({ x: 5, y: 5 });
+      occupyBed(bed, 'colonist_1');
+      vacateBed(bed);
+      expect(bed.occupiedBy).toBeNull();
+    });
+  });
+
+  describe('getBedAt', () => {
+    it('finds bed at position', () => {
+      const beds: Bed[] = [
+        createBed({ x: 5, y: 5 }),
+        createBed({ x: 10, y: 10 }),
+      ];
+      const bed = getBedAt(beds, { x: 5, y: 5 });
+      expect(bed).not.toBeNull();
+      expect(bed?.pos).toEqual({ x: 5, y: 5 });
+    });
+
+    it('returns null when no bed at position', () => {
+      const beds: Bed[] = [createBed({ x: 5, y: 5 })];
+      expect(getBedAt(beds, { x: 0, y: 0 })).toBeNull();
+    });
+
+    it('returns null for empty beds array', () => {
+      expect(getBedAt([], { x: 5, y: 5 })).toBeNull();
+    });
+  });
+
+  describe('findNearestAvailableBed', () => {
+    it('finds nearest unoccupied bed', () => {
+      const beds: Bed[] = [
+        createBed({ x: 10, y: 10 }),
+        createBed({ x: 3, y: 3 }),
+      ];
+      const nearest = findNearestAvailableBed(beds, { x: 0, y: 0 });
+      expect(nearest?.pos).toEqual({ x: 3, y: 3 });
+    });
+
+    it('skips occupied beds', () => {
+      const beds: Bed[] = [
+        createBed({ x: 1, y: 1 }), // Nearest but will be occupied
+        createBed({ x: 10, y: 10 }),
+      ];
+      occupyBed(beds[0], 'colonist_1');
+      
+      const nearest = findNearestAvailableBed(beds, { x: 0, y: 0 });
+      expect(nearest?.pos).toEqual({ x: 10, y: 10 });
+    });
+
+    it('returns null when all beds occupied', () => {
+      const beds: Bed[] = [createBed({ x: 5, y: 5 })];
+      occupyBed(beds[0], 'colonist_1');
+      expect(findNearestAvailableBed(beds, { x: 0, y: 0 })).toBeNull();
+    });
+
+    it('returns null for empty beds array', () => {
+      expect(findNearestAvailableBed([], { x: 0, y: 0 })).toBeNull();
     });
   });
 });

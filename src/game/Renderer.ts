@@ -21,6 +21,7 @@ export function renderGame(ctx: CanvasRenderingContext2D, state: GameState): voi
   // Render layers
   renderWorld(ctx, state);
   renderDesignations(ctx, state);
+  renderBeds(ctx, state);
   renderItems(ctx, state);
   renderColonists(ctx, state.colonists);
   renderDayNightOverlay(ctx, state);
@@ -66,6 +67,17 @@ export function renderDesignations(ctx: CanvasRenderingContext2D, state: GameSta
       ctx.fillRect(pos.x * TILE_SIZE, pos.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
       ctx.globalAlpha = 1.0;
     }
+  }
+}
+
+export function renderBeds(ctx: CanvasRenderingContext2D, state: GameState): void {
+  ctx.font = `${FONT_SIZE}px monospace`;
+  ctx.textBaseline = 'top';
+
+  for (const bed of state.beds) {
+    // Draw bed with different color if occupied
+    ctx.fillStyle = bed.occupiedBy ? '#8b6914' : '#c9a227';
+    ctx.fillText(ASCII_CHARS.BED, bed.pos.x * TILE_SIZE, bed.pos.y * TILE_SIZE);
   }
 }
 
