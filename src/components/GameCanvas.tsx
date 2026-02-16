@@ -14,6 +14,7 @@ import {
   designateArea,
 } from '../game/Game';
 import { renderGame, renderSelection } from '../game/Renderer';
+import { Sound } from '../game/Sound';
 
 import TitleScreen from './TitleScreen';
 import StatusBar from './StatusBar';
@@ -88,6 +89,7 @@ export default function GameCanvas() {
       switch (e.key.toLowerCase()) {
         case 'd':
           // Cycle through designations
+          Sound.play('select');
           if (game.designMode === DesignMode.MINE) {
             setDesignMode(game, DesignMode.CHOP);
           } else {
@@ -98,6 +100,7 @@ export default function GameCanvas() {
           
         case 'b':
           // Build mode - cycle through build types
+          Sound.play('select');
           if (game.designMode === DesignMode.BUILD) {
             const types = [BuildType.WALL, BuildType.FLOOR, BuildType.DOOR, BuildType.BED];
             const currentIdx = game.selectedBuild ? types.indexOf(game.selectedBuild) : -1;
@@ -110,12 +113,14 @@ export default function GameCanvas() {
           break;
           
         case 's':
+          Sound.play('select');
           setDesignMode(game, DesignMode.STOCKPILE);
           setGame({ ...game });
           break;
           
         case ' ':
           e.preventDefault();
+          Sound.play('select');
           togglePause(game);
           setGame({ ...game });
           break;
@@ -181,6 +186,21 @@ export default function GameCanvas() {
   const handleMouseUp = useCallback(() => {
     if (!dragStart || !dragEnd) return;
     if (game.designMode === DesignMode.NONE) return;
+    
+    // Play appropriate sound for designation type
+    switch (game.designMode) {
+      case DesignMode.MINE:
+        Sound.play('mine');
+        break;
+      case DesignMode.CHOP:
+        Sound.play('chop');
+        break;
+      case DesignMode.BUILD:
+        Sound.play('build');
+        break;
+      default:
+        Sound.play('select');
+    }
     
     designateArea(game, dragStart, dragEnd);
     setGame({ ...game });

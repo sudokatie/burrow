@@ -10,6 +10,8 @@ Drop 3 colonists into a procedurally generated world. They have needs (hunger, r
 
 The AI isn't fancy. Colonists pathfind to tasks, work until they're done or starving, then go find food. Night makes everything darker. Day makes it brighter. The loop continues until everyone dies or you get bored.
 
+Retro synthesized sound effects for all actions - mining, chopping, building, eating, sleeping.
+
 ## Controls
 
 - **D** - Cycle through designation modes (mine, chop)
@@ -38,7 +40,7 @@ Open http://localhost:3000 in a browser.
 npm test
 ```
 
-260 tests covering world generation, pathfinding, colonist needs, task assignment, building construction, and bed mechanics. The game logic is fully tested. The rendering isn't - you'll have to trust that Canvas works.
+277 tests covering world generation, pathfinding, colonist needs, task assignment, building construction, and bed mechanics. The game logic is fully tested. The rendering isn't - you'll have to trust that Canvas works.
 
 ## Project Structure
 
@@ -53,6 +55,7 @@ src/
     Building.ts # Construction and materials
     Pathfinding.ts # A* algorithm
     Time.ts    # Day/night cycle
+    Sound.ts   # Web Audio synthesized SFX
     Game.ts    # Main game state orchestration
     Renderer.ts # ASCII canvas rendering
   components/  # React UI overlays
