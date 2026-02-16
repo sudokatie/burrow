@@ -10,7 +10,7 @@ Drop 3 colonists into a procedurally generated world. They have needs (hunger, r
 
 The AI isn't fancy. Colonists pathfind to tasks, work until they're done or starving, then go find food. Night makes everything darker. Day makes it brighter. The loop continues until everyone dies or you get bored.
 
-Retro synthesized sound effects for all actions - mining, chopping, building, eating, sleeping.
+Retro synthesized sound effects for all actions - mining, chopping, building, eating, sleeping. Local leaderboard tracks your best colonies.
 
 ## Controls
 
