@@ -155,7 +155,7 @@ export default function GameCanvas() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [game]);
   
-  // Mouse handlers
+  // Mouse/touch handlers
   const getTilePos = useCallback((e: React.MouseEvent<HTMLCanvasElement>): Position => {
     const canvas = canvasRef.current;
     if (!canvas) return { x: 0, y: 0 };
@@ -163,6 +163,17 @@ export default function GameCanvas() {
     const rect = canvas.getBoundingClientRect();
     const x = Math.floor((e.clientX - rect.left) / TILE_SIZE);
     const y = Math.floor((e.clientY - rect.top) / TILE_SIZE);
+    
+    return { x, y };
+  }, []);
+
+  const getTilePosFromTouch = useCallback((touch: React.Touch): Position => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+    
+    const rect = canvas.getBoundingClientRect();
+    const x = Math.floor((touch.clientX - rect.left) / TILE_SIZE);
+    const y = Math.floor((touch.clientY - rect.top) / TILE_SIZE);
     
     return { x, y };
   }, []);
@@ -217,6 +228,55 @@ export default function GameCanvas() {
     setDragEnd(null);
     setGame({ ...game });
   }, [game]);
+
+  // Touch handlers (mirror mouse handlers for mobile support)
+  const handleTouchStart = useCallback((e: React.TouchEvent<HTMLCanvasElement>) => {
+    if (game.screen !== GameScreen.PLAYING) return;
+    if (game.designMode === DesignMode.NONE) return;
+    if (e.touches.length !== 1) return;
+    
+    e.preventDefault();
+    const pos = getTilePosFromTouch(e.touches[0]);
+    setDragStart(pos);
+    setDragEnd(pos);
+  }, [game.screen, game.designMode, getTilePosFromTouch]);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent<HTMLCanvasElement>) => {
+    if (!dragStart) return;
+    if (e.touches.length !== 1) return;
+    
+    e.preventDefault();
+    const pos = getTilePosFromTouch(e.touches[0]);
+    setDragEnd(pos);
+  }, [dragStart, getTilePosFromTouch]);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent<HTMLCanvasElement>) => {
+    if (!dragStart || !dragEnd) return;
+    if (game.designMode === DesignMode.NONE) return;
+    
+    e.preventDefault();
+    
+    // Play appropriate sound for designation type
+    switch (game.designMode) {
+      case DesignMode.MINE:
+        Sound.play('mine');
+        break;
+      case DesignMode.CHOP:
+        Sound.play('chop');
+        break;
+      case DesignMode.BUILD:
+        Sound.play('build');
+        break;
+      default:
+        Sound.play('select');
+    }
+    
+    designateArea(game, dragStart, dragEnd);
+    setGame({ ...game });
+    
+    setDragStart(null);
+    setDragEnd(null);
+  }, [dragStart, dragEnd, game]);
   
   // Game start handler
   const handleStart = useCallback(() => {
@@ -235,6 +295,9 @@ export default function GameCanvas() {
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onContextMenu={handleContextMenu}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
         onMouseLeave={() => {
           setDragStart(null);
           setDragEnd(null);
