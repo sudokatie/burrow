@@ -25,3 +25,21 @@ body {
     text-wrap: balance;
   }
 }
+
+/* Responsive canvas scaling */
+canvas {
+  max-width: 100%;
+  height: auto;
+  touch-action: none;
+}
+
+/* Mobile-friendly layout */
+@media (max-width: 768px) {
+  .flex-col {
+    gap: 0.5rem !important;
+  }
+  
+  .p-4 {
+    padding: 0.5rem !important;
+  }
+}
