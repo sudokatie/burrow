@@ -34,7 +34,8 @@ class MusicSystem {
     
     if (!this.context) {
       try {
-        this.context = new (window.AudioContext || (window as any).webkitAudioContext)();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        this.context = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
       } catch {
         return null;
       }
@@ -232,7 +233,8 @@ class MusicSystem {
   }
 
   static resetInstance(): void {
-    MusicSystem.instance = undefined as any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    MusicSystem.instance = undefined as unknown as MusicSystem;
   }
 }
 
