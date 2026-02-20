@@ -15,6 +15,7 @@ import {
 } from '../game/Game';
 import { renderGame, renderSelection } from '../game/Renderer';
 import { Sound } from '../game/Sound';
+import { Music } from '../game/Music';
 
 import TitleScreen from './TitleScreen';
 import StatusBar from './StatusBar';
@@ -80,6 +81,20 @@ export default function GameCanvas() {
       renderSelection(ctx, dragStart, dragEnd);
     }
   }, [game, dragStart, dragEnd]);
+
+  // Switch music track based on game screen
+  useEffect(() => {
+    switch (game.screen) {
+      case GameScreen.TITLE:
+      case GameScreen.HELP:
+        Music.play('menu');
+        break;
+      case GameScreen.PLAYING:
+      case GameScreen.PAUSED:
+        Music.play('gameplay');
+        break;
+    }
+  }, [game.screen]);
   
   // Keyboard handlers
   useEffect(() => {
